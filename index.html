@@ -3,8 +3,417 @@
 <head>
     <meta charset="UTF-8">
     <title>Кантуем Куб</title>
+    <style>
+        body {
+            background: black;
+            margin: 0;
+        }
+
+        #gameCanvas {
+            background: black;
+            display: block;
+            text-align: center;
+            box-sizing: border-box;
+            display: flex;
+        }
+
+        .file-input {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+        }
+    </style>
 </head>
-<body>
-<script src="game.js"></script>
+<body onload="setup()">
+<script src="threeJs/three.js"></script>
+<script src="threeJs/keyboard.js"></script>
+<script src="threeJs/OrbitControls.js"></script>
+<div class="file-drop-area">
+    <input class="file-input" type="file">
+</div>
+<div id="gameCanvas"></div>
+<script>
+    var renderer, scene, camera, pointLight, spotLight, ground, cube;
+    var map = [], tmp, finish = false, oldPos = {x: 0, y: 0}, moving = false;
+    var position = {x: 0, y: 0, curSide: ""}, target = {x: 0, y: 0, targetSide: ""};
+    var rotWorldMatrix;
+    var xAxis = new THREE.Vector3(1, 0, 0);
+    var yAxis = new THREE.Vector3(0, 1, 0);
+    var zAxis = new THREE.Vector3(0, 0, 1);
+    const sides = {
+        top: "top",
+        bot: "bottom",
+        left: "left",
+        right: "right",
+        front: "front",
+        back: "back"
+    };
+
+    function setup() {
+        let canv = document.querySelectorAll("div");
+        canv.width = window.innerWidth;
+        canv.height = window.innerHeight;
+        console.log(canv[1]);
+        createScene();
+        draw();
+    }
+
+    var inputF = document.querySelector('input');
+    inputF.width = window.innerWidth;
+    inputF.height = window.innerHeight;
+    inputF.addEventListener('change', function (input) {
+        let reader = new FileReader();
+        let file = input.target.files[0];
+        reader.readAsText(file);
+        reader.onload = function () {
+            tmp = reader.result.split('\n');
+            for (let i = 0; i < tmp.length; i++) {
+                map.push(tmp[i]);
+            }
+            inputF.style.visibility = "hidden";
+            CreateMap();
+        }
+    });
+
+    function createTex(type) {
+        var canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 256;
+        var context = canvas.getContext('2d');
+        switch (type) {
+            case 1: {
+                context.fillStyle = 'rgb(102, 0, 255)';
+
+                break;
+            }
+            case 2: {
+                context.fillStyle = 'rgb(255,3,62)';
+                break;
+            }
+            case 3: {
+                context.fillStyle = 'rgb(90,255,58)';
+                break;
+            }
+            default:
+                break;
+        }
+
+        context.fillRect(0, 0, 256, 256);
+
+        return canvas;
+
+    }
+
+    function CreateMap() {
+        let geometry, texture, mesh, material;
+        let width, height = (map.length * 50) / 2;
+        geometry = new THREE.CubeGeometry(50, 50, 30);
+        for (let i = 0; i < map.length; i++) {
+            if (i > 0)
+                height -= 50;
+            width = ((map[0].length - 1) * -50) / 2;
+            for (let j = 0; j < map[0].length - 1; j++) {
+                switch (map[i][j]) {
+                    case '0':
+                        continue;
+                    case '1':
+                        texture = new THREE.CanvasTexture(createTex(1));
+                        break;
+                    case '2':
+                        target.x = j;
+                        target.y = i;
+                        target.targetSide = sides.bot;
+                        texture = new THREE.CanvasTexture(createTex(2));
+                        break;
+                    case '3':
+                        position.x = j;
+                        position.y = i;
+                        position.curSide = sides.back;
+                        cube.position.set(width + (j * 50), height, ground.position.z + geometry.parameters.depth + (cube.geometry.parameters.depth / 2) + 2);
+                        texture = new THREE.CanvasTexture(createTex(3));
+                        break;
+                    default:
+                        break;
+                }
+                material = new THREE.MeshBasicMaterial({map: texture, wireframe: false});
+                mesh = new THREE.Mesh(geometry, material);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                scene.add(mesh);
+                mesh.position.set(width + (j * 50), height, ground.position.z + geometry.parameters.depth / 2 + 1);
+
+                geometry.dispose();
+                material.dispose();
+                texture.dispose();
+            }
+        }
+        console.log("Start x: " + position.x + " y: " + position.y + "current cube position: " + position.curSide);
+        console.log("Target x: " + target.x + " y: " + target.y + "target cube position: " + target.targetSide);
+    }
+
+    function createScene() {
+        var WIDTH = window.innerWidth,
+            HEIGHT = window.innerHeight;
+        var VIEW_ANGLE = 60,
+            ASPECT = WIDTH / HEIGHT,
+            NEAR = 0.1,
+            FAR = 10000;
+
+        var c = document.getElementById("gameCanvas");
+        renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
+        camera = new THREE.PerspectiveCamera(VIEW_ANGLE, ASPECT, NEAR, FAR);
+        scene = new THREE.Scene();
+
+        scene.add(camera);
+        camera.position.y = 0;
+        camera.position.z = 700;
+
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        renderer.setSize(WIDTH, HEIGHT);
+        c.appendChild(renderer.domElement);
+
+        var groundMaterial = new THREE.MeshLambertMaterial({color: 0xffffff});
+        var materials = [
+                new THREE.MeshBasicMaterial({
+                        transparent: true,
+                        opacity: 0.5,
+                        wireframe: false,
+                        side: THREE.DoubleSide
+                    }
+                ),
+                new THREE.MeshBasicMaterial({
+                    transparent: true, opacity: 0.5, wireframe: false,
+                    side: THREE.DoubleSide
+                }),
+                new THREE.MeshBasicMaterial({transparent: true, color: 0xff0000, side: THREE.DoubleSide}),
+                new THREE.MeshBasicMaterial({
+                    transparent: true, opacity: 0.5, wireframes: false, alpha: true,
+                    side: THREE.DoubleSide
+                }),
+                new THREE.MeshBasicMaterial({
+                    transparent: true, opacity: 0.5, wireframe: false, alpha: true,
+                    side: THREE.DoubleSide
+                }),
+                new THREE.MeshBasicMaterial({
+                    transparent: true, opacity: 0.5, wireframe: false, alpha: true,
+                    side: THREE.DoubleSide
+                })
+            ]
+        ;
+        cube = new THREE.Mesh(new THREE.CubeGeometry(50, 50, 50, 1, 1, 1), new THREE.MeshFaceMaterial(materials));
+
+        cube.position.z = -20000;
+        cube.castShadow = true;
+        scene.add(cube);
+
+        ground = new THREE.Mesh(new THREE.CubeGeometry(1000, 1000, 1), groundMaterial);
+
+        ground.position.z = -200;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        var am_light = new THREE.AmbientLight(0xaaaaaa); // soft white light
+        scene.add(am_light);
+
+        pointLight = new THREE.PointLight(0xfdeaa8);
+
+        pointLight.position.x = 0;
+        pointLight.position.y = 0;
+        pointLight.position.z = 1000;
+        pointLight.intensity = 1;
+        pointLight.distance = 2000;
+        scene.add(pointLight);
+
+        spotLight = new THREE.SpotLight(0xF8D898);
+        spotLight.position.set(0, 0, 100);
+        spotLight.intensity = 0.15;
+        spotLight.castShadow = true;
+        spotLight.receiveShadow = true;
+        scene.add(spotLight);
+
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    }
+
+    function rotateAroundWorldAxis(object, axis, radians) {
+        rotWorldMatrix = new THREE.Matrix4();
+        rotWorldMatrix.makeRotationAxis(axis.normalize(), radians);
+        rotWorldMatrix.multiply(object.matrix);
+        object.matrix = rotWorldMatrix;
+        object.rotation.setFromRotationMatrix(object.matrix);
+    }
+
+    var dir = {
+        forward: false,
+        back: false,
+        left: false,
+        right: false
+    };
+
+    function CubeMoving() {
+        document.onkeydown = function (e) {
+            if (!moving) {
+                oldPos.x = cube.position.x;
+                oldPos.y = cube.position.y;
+            }
+            switch (e.keyCode) {
+                case Key.A: {
+                    if (map[0].length - 1 > position.x && position.x > 0)
+                        if (map[position.y][position.x - 1] != 0 && position.x > 0 && !moving) {
+                            position.x--;
+                            dir.left = true;
+                            SideChange("left");
+                        }
+                    break;
+                }
+                case Key.D: {
+                    if (map[0].length - 1 > position.x + 1)
+                        if (map[position.y][position.x + 1] != 0 && (position.x >= 0 && position.x < map[0].length - 1) && !moving) {
+                            position.x++;
+                            dir.right = true;
+                            SideChange("right");
+                        }
+                    break;
+                }
+                case Key.W: {
+                    if (map.length > position.y && position.y > 0)
+                        if (map[position.y - 1][position.x] != 0 && (position.y > 0) && !moving) {
+                            position.y--;
+                            dir.forward = true;
+                            SideChange("front");
+                        }
+                    break;
+                }
+                case Key.S: {
+                    if (map.length > position.y + 1)
+                        if (map[position.y + 1][position.x] != 0 && (position.y >= 0 && position.y < map.length) && !moving) {
+                            position.y++;
+                            dir.back = true;
+                            SideChange("back");
+                        }
+                    break;
+                }
+                default:
+                    break;
+            }
+
+        }
+    }
+
+    function SideChange(turn) {
+        switch (turn) {
+            case 'front': {
+                if (position.curSide === sides.top)
+                    position.curSide = sides.back;
+                else if (position.curSide === sides.back)
+                    position.curSide = sides.bot;
+                else if (position.curSide === sides.front)
+                    position.curSide = sides.top;
+                else if (position.curSide === sides.bot)
+                    position.curSide = sides.front;
+                break;
+            }
+            case 'back': {
+                if (position.curSide === sides.top)
+                    position.curSide = sides.front;
+                else if (position.curSide === sides.back)
+                    position.curSide = sides.top;
+                else if (position.curSide === sides.front)
+                    position.curSide = sides.bot;
+                else if (position.curSide === sides.bot)
+                    position.curSide = sides.front;
+                break;
+            }
+            case 'left': {
+                if (position.curSide === sides.top)
+                    position.curSide = sides.left;
+                else if (position.curSide === sides.bot)
+                    position.curSide = sides.right;
+                else if (position.curSide === sides.left)
+                    position.curSide = sides.bot;
+                else if (position.curSide === sides.right)
+                    position.curSide = sides.top;
+                break;
+            }
+            case 'right': {
+                if (position.curSide === sides.top)
+                    position.curSide = sides.right;
+                else if (position.curSide === sides.bot)
+                    position.curSide = sides.left;
+                else if (position.curSide === sides.left)
+                    position.curSide = sides.top;
+                else if (position.curSide === sides.right)
+                    position.curSide = sides.bot;
+                break;
+            }
+            default:
+                break;
+        }
+        console.log(position);
+        // var q = cube.quaternion;
+        // var o = Math.acos(q.w) * 2;
+        // var ax = q.x / Math.sin(Math.acos(q.w));
+        // var ay = q.y / Math.sin(Math.acos(q.w));
+        // var az = q.z / Math.sin(Math.acos(q.w));
+        // console.log("x = " + Math.atan(ax) + " y=" + Math.atan(ay) + " z= " + Math.atan(az));
+    }
+
+    function CheckState() {
+        if (position.x == target.x && position.y == target.y && position.curSide == target.targetSide && position.curSide != "" && target.targetSide != "") {
+            alert("Yay, you finished");
+            finish = true;
+
+        }
+    }
+
+    function Animate() {
+        if (dir.back) {
+            moving = true;
+            cube.position.y -= 5;
+            rotateAroundWorldAxis(cube, xAxis, Math.PI / 20);
+            if (cube.position.y === oldPos.y - 50) {
+                dir.back = false;
+                moving = false;
+            }
+        } else if (dir.forward) {
+            moving = true;
+            cube.position.y += 5;
+            rotateAroundWorldAxis(cube, xAxis, -Math.PI / 20);
+            if (cube.position.y === oldPos.y + 50) {
+                dir.forward = false;
+                moving = false;
+            }
+        } else if (dir.left) {
+            moving = true;
+            cube.position.x -= 5;
+            rotateAroundWorldAxis(cube, yAxis, -Math.PI / 20);
+            if (cube.position.x === oldPos.x - 50) {
+                dir.left = false;
+                moving = false;
+            }
+        } else if (dir.right) {
+            moving = true;
+            cube.position.x += 5;
+            rotateAroundWorldAxis(cube, yAxis, Math.PI / 20);
+            if (cube.position.x === oldPos.x + 50) {
+                dir.right = false;
+                moving = false;
+            }
+        }
+    }
+
+    function draw() {
+        renderer.render(scene, camera);
+        requestAnimationFrame(draw);
+        Animate();
+        if (!dir.left && !dir.back && !dir.forward && !dir.right && !moving)
+            if (finish !== true) {
+                CheckState();
+                CubeMoving();
+            }
+    }
+
+</script>
 </body>
 </html>
