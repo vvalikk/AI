@@ -55,7 +55,7 @@
         let canv = document.querySelectorAll("div");
         canv.width = window.innerWidth;
         canv.height = window.innerHeight;
-        console.log(canv[1]);
+
         createScene();
         draw();
     }
@@ -351,9 +351,12 @@
     function CheckState() {
         if (position.x == target.x && position.y == target.y && position.curSide == target.targetSide && position.curSide != "" && target.targetSide != "") {
             alert("Yay, you finished");
-            finish = true;
             document.onkeydown = null;
-        }
+            finish = true;
+            return true;
+        } else
+            return false
+
     }
 
     function Animate() {
@@ -389,6 +392,49 @@
                 dir.right = false;
                 moving = false;
             }
+        }
+    }
+
+    var openlist = [], closelist = [];
+
+    function OpenAction() {
+        let wayfound = false;
+        let el;
+        let tmp;
+        while (openlist.length != 0) {
+            el = openlist.pop();
+            if (CheckState()) {
+                closelist.push(el);
+                wayfound = true;
+                alert("Way found!");
+                break;
+            }
+            closelist.push(el);
+            var deadend = true;
+            //if(x.depth<depth) Ограничение глубины
+            for (let i = 0; i < map.length; i++) {
+                for (let j = 0; j < map[0].length; j++) {
+                    //если вернулось nope то continue
+                    tmp.clone(el);
+
+                }
+            }
+        }
+    }
+
+    function step() {
+        if (dir.left) {
+            // if(map[i][j]===0)
+            // return nope;
+        }
+        if (dir.right) {
+
+        }
+        if (dir.forward) {
+
+        }
+        if (dir.back) {
+
         }
     }
 
