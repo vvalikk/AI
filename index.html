@@ -77,39 +77,12 @@
         }
     });
 
-    function createTex(type) {
-        var canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 256;
-        var context = canvas.getContext('2d');
-        switch (type) {
-            case 1: {
-                context.fillStyle = 'rgb(102, 0, 255)';
-
-                break;
-            }
-            case 2: {
-                context.fillStyle = 'rgb(255,3,62)';
-                break;
-            }
-            case 3: {
-                context.fillStyle = 'rgb(90,255,58)';
-                break;
-            }
-            default:
-                break;
-        }
-
-        context.fillRect(0, 0, 256, 256);
-
-        return canvas;
-
-    }
-
 
     function CreateMap() {
         let geometry, texture, mesh, material;
         let width, height = (map.length * 50) / 2;
+        let miniBlock = false;
+        let miniBlockGeom = new THREE.CubeGeometry(25, 25, 10);
 
         geometry = new THREE.CubeGeometry(50, 50, 30);
         texLava = loader.load('https://i.imgur.com/AmgrEjg.jpg');
@@ -141,16 +114,25 @@
                         cube.position.set(width + (j * 50), height, ground.position.z + geometry.parameters.depth + (cube.geometry.parameters.depth / 2) + 2 + 1);
                         texture = texPlayer;
                         break;
+                    case '4':
+                        texture = texPoint;
+                        miniBlock = true;
+                        break;
                     default:
                         break;
                 }
-                material = new THREE.MeshBasicMaterial({map: texture, wireframe: false});
-                mesh = new THREE.Mesh(geometry, material);
+                material = new THREE.MeshBasicMaterial({map: texture});
+                if (!miniBlock)
+                    mesh = new THREE.Mesh(geometry, material);
+                else {
+                    mesh = new THREE.Mesh(miniBlockGeom, material);
+                    miniBlock = false;
+                }
+
                 mesh.castShadow = true;
                 mesh.receiveShadow = true;
                 scene.add(mesh);
                 mesh.position.set(width + (j * 50), height, ground.position.z + geometry.parameters.depth / 2 + 1);
-
                 geometry.dispose();
                 material.dispose();
                 texture.dispose();
@@ -188,16 +170,15 @@
         var materials = [
             new THREE.MeshBasicMaterial({
                     transparent: true,
-                    opacity: 0.6,
-                    wireframe: false
+                    opacity: 0.6
                 }
             ),
-            //material = new THREE.MeshBasicMaterial({map: texture, wireframe: false});
-            new THREE.MeshBasicMaterial({transparent: true, opacity: 0.6, wireframe: false}),
+            //material = new THREE.MeshBasicMaterial({map: texture});
+            new THREE.MeshBasicMaterial({transparent: true, opacity: 0.6}),
             new THREE.MeshBasicMaterial({map: chartex, side: THREE.DoubleSide}),
-            new THREE.MeshBasicMaterial({transparent: true, opacity: 0.6, wireframes: false}),
-            new THREE.MeshBasicMaterial({transparent: true, opacity: 0.6, wireframe: false}),
-            new THREE.MeshBasicMaterial({transparent: true, opacity: 0.6, wireframe: false})
+            new THREE.MeshBasicMaterial({transparent: true, opacity: 0.6}),
+            new THREE.MeshBasicMaterial({transparent: true, opacity: 0.6}),
+            new THREE.MeshBasicMaterial({transparent: true, opacity: 0.6})
         ];
         cube = new THREE.Mesh(new THREE.CubeGeometry(50, 50, 50, 1, 1, 1), new THREE.MeshFaceMaterial(materials));
 
@@ -329,7 +310,7 @@
                 else if (state.curSide === sides.front)
                     state.curSide = sides.bot;
                 else if (state.curSide === sides.bot)
-                    state.curSide = sides.front;
+                    state.curSide = sides.back;
                 break;
             }
             case 'left': {
@@ -357,7 +338,6 @@
             default:
                 break;
         }
-        // console.log(state);
     }
 
     function SideChange(turn) {
@@ -381,7 +361,7 @@
                 else if (position.curSide === sides.front)
                     position.curSide = sides.bot;
                 else if (position.curSide === sides.bot)
-                    position.curSide = sides.front;
+                    position.curSide = sides.back;
                 break;
             }
             case 'left': {
@@ -409,7 +389,7 @@
             default:
                 break;
         }
-        console.log(position);
+        // console.log(position);
     }
 
     function CheckState() {
@@ -481,31 +461,31 @@
     }
 
     function OpenAction() {
-        // console.log('im in');
+        // debugger
         let wayfound = false;
         let el;
         let count = 0;
+        let deadend;
+        let first = true;
         while (openlist.length != 0) {
-            // for (let i = 0; i < openlist.length; i++)
-            //     if (openlist[i].x == 5 && openlist[i].y == 4)
-            //         debugger
-
             el = openlist.pop();
+            if (first) {
+                el.parent = el;
+                first = false;
+            }
             count++;
             if (algCheckState(el)) {
                 closelist.push(el);
                 wayfound = true;
-                console.log("way found at x: " + el.x + " y: " + el.y + " on side:" + el.side + "it takes: " + count + " steps");
+                console.log("way found at x: " + el.x + " y: " + el.y + " on side:" + el.curSide + " it takes: " + count + " steps");
                 console.log(closelist);
                 alert("Way found!");
                 break;
             }
             closelist.push(el);
-            var deadend = true;
-
+            deadend = true;
             for (let i = 0; i < 4; i++) {
                 state = Object.assign({}, el);
-                //flagstep
                 if (step(i) === "fall")
                     continue;
                 else {
@@ -516,42 +496,72 @@
                     }
                 }
             }
+            if (deadend && openlist.length > 0) {
+                cleanClose();
+
+            }
         }
+    }
+
+    function cleanClose() {
+        var ctmp = closelist.pop();
+        var ctmp1 = openlist[openlist.length - 1];
+        while (ctmp != ctmp1.parent) {
+            ctmp = closelist.pop();
+        }
+        closelist.push(ctmp);
+    }
+
+    function Compare(st1, st2) {
+        return st1.x == st2.x && st1.y == st2.y && st1.curSide == st2.curSide && st1.parent == st2.parent;
     }
 
     function step(i) {
         if (i === 0) {
             if (map[0].length - 1 >= state.x && state.x > 0)
                 if (map[state.y][state.x - 1] != 0 && state.x > 0) {
-                    state.x--;
-                    // dir.left = true;
                     algSideChange("left");
+                    if (map[state.y][state.x - 1] == 4 && state.x > 0 && state.curSide != sides.bot) {
+                        algSideChange("right");
+                        return "fall";
+                    }
+                    state.x--;
                     return "step";
                 }
         } else if (i === 1) {
             if (map.length - 1 >= state.y && state.y > 0)
                 if (map[state.y - 1][state.x] != 0 && (state.y > 0)) {
-                    state.y--;
-                    // dir.forward = true;
                     algSideChange("front");
+                    if (map[state.y - 1][state.x] == 4 && state.y > 0 && state.curSide != sides.bot) {
+                        algSideChange("back");
+                        return "fall";
+                    }
+                    state.y--;
                     return "step";
                 }
         } else if (i === 2) {
 
             if (map[0].length - 1 >= state.x + 1)
                 if (map[state.y][state.x + 1] != 0 && (state.x >= 0 && state.x < map[0].length - 1)) {
-                    state.x++;
-                    // dir.right = true;
                     algSideChange("right");
+                    if (map[state.y][state.x + 1] == 4 && state.x >= 0 && state.x < map[0].length - 1 && state.curSide != sides.bot) {
+                        algSideChange("left");
+                        return "fall";
+                    }
+
+                    state.x++;
                     return "step";
                 }
 
         } else if (i === 3) {
             if (map.length - 1 >= state.y + 1)
                 if (map[state.y + 1][state.x] != 0 && (state.y >= 0 && state.y < map.length)) {
-                    state.y++;
-                    // dir.back = true;
                     algSideChange("back");
+                    if (map[state.y + 1][state.x] == 4 && (state.y >= 0 && state.y < map.length && state.curSide == sides.bot)) {
+                        algSideChange("front");
+                        return "fall";
+                    }
+                    state.y++;
                     return "step";
                 }
         }
