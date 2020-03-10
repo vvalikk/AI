@@ -38,6 +38,7 @@
     var map = [], tmp, finish = false, oldPos = {x: 0, y: 0}, moving = false;
     var position = {x: 0, y: 0, curSide: ""}, target = {x: 0, y: 0, targetSide: ""};
     var rotWorldMatrix, state = {x: 0, y: 0, side: "", parent: null};
+    var start = 0, finish = 0;
     const loader = new THREE.TextureLoader();
     var xAxis = new THREE.Vector3(1, 0, 0);
     var yAxis = new THREE.Vector3(0, 1, 0);
@@ -410,7 +411,7 @@
 
     function CheckState() {
         if (position.x == target.x && position.y == target.y && position.curSide == target.targetSide && position.curSide != "" && target.targetSide != "") {
-            alert("Yay, you finished");
+            // alert("Yay, you finished");
             document.onkeydown = null;
             finish = true;
             return true;
@@ -421,7 +422,7 @@
 
     function algCheckState(state) {
         if (state.x == target.x && state.y == target.y && state.curSide == target.targetSide && state.curSide != "" && target.targetSide != "") {
-            alert("yay");
+            // alert("yay");
             // finish = true;
             return true;
         } else
@@ -482,6 +483,7 @@
 
     function OpenAction() {
         // debugger
+        var time = performance.now();
         let wayfound = false;
         let el;
         let count = 0;
@@ -499,8 +501,10 @@
                 wayfound = true;
                 console.log("way found at x: " + el.x + " y: " + el.y + " on side:" + el.curSide + " it takes: " + count + " steps");
                 console.log(closelist);
-                animatePath();
+                time = performance.now() - time;
+                console.log('Время выполнения = ', time);
                 alert("Way found!");
+                animatePath();
                 break;
             }
             closelist.push(el);
@@ -519,7 +523,6 @@
             }
             if (deadend && openlist.length > 0) {
                 cleanClose();
-
             }
         }
     }
