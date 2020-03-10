@@ -243,36 +243,52 @@
                     case Key.A: {
                         if (map[0].length - 1 > position.x && position.x > 0)
                             if (map[position.y][position.x - 1] != 0 && position.x > 0 && !moving) {
+                                SideChange("left");
+                                if (map[position.y][position.x - 1] == 4 && position.x > 0 && position.curSide != sides.bot) {
+                                    SideChange("right");
+                                    break;
+                                }
                                 position.x--;
                                 dir.left = true;
-                                SideChange("left");
                             }
                         break;
                     }
                     case Key.D: {
                         if (map[0].length - 1 > position.x + 1)
                             if (map[position.y][position.x + 1] != 0 && (position.x >= 0 && position.x < map[0].length - 1) && !moving) {
+                                SideChange("right");
+                                if (map[position.y][position.x + 1] == 4 && position.x >= 0 && position.x < map[0].length - 1 && position.curSide != sides.bot) {
+                                    SideChange("left");
+                                    break;
+                                }
                                 position.x++;
                                 dir.right = true;
-                                SideChange("right");
                             }
                         break;
                     }
                     case Key.W: {
                         if (map.length > position.y && position.y > 0)
                             if (map[position.y - 1][position.x] != 0 && (position.y > 0) && !moving) {
+                                SideChange("front");
+                                if (map[position.y - 1][position.x] == 4 && position.y > 0 && position.curSide != sides.bot) {
+                                    SideChange("back");
+                                    break;
+                                }
                                 position.y--;
                                 dir.forward = true;
-                                SideChange("front");
                             }
                         break;
                     }
                     case Key.S: {
                         if (map.length > position.y + 1)
                             if (map[position.y + 1][position.x] != 0 && (position.y >= 0 && position.y < map.length) && !moving) {
+                                SideChange("back");
+                                if (map[position.y + 1][position.x] == 4 && (position.y >= 0 && position.y < map.length && position.curSide == sides.bot)) {
+                                    SideChange("front");
+                                    break;
+                                }
                                 position.y++;
                                 dir.back = true;
-                                SideChange("back");
                             }
                         break;
                     }
@@ -413,6 +429,10 @@
 
     }
 
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
     function Animate() {
         if (dir.back) {
             moving = true;
@@ -479,6 +499,7 @@
                 wayfound = true;
                 console.log("way found at x: " + el.x + " y: " + el.y + " on side:" + el.curSide + " it takes: " + count + " steps");
                 console.log(closelist);
+                animatePath();
                 alert("Way found!");
                 break;
             }
@@ -512,8 +533,22 @@
         closelist.push(ctmp);
     }
 
-    function Compare(st1, st2) {
-        return st1.x == st2.x && st1.y == st2.y && st1.curSide == st2.curSide && st1.parent == st2.parent;
+    async function animatePath() {
+        for (let i = 1; i < closelist.length; i++) {
+            await sleep(500);
+            if (closelist[i].x > closelist[i - 1].x) {
+                dir.right = true;
+            } else if (closelist[i].x < closelist[i - 1].x) {
+                dir.left = true;
+            } else if (closelist[i].y < closelist[i - 1].y) {
+                dir.forward = true;
+            } else if (closelist[i].y > closelist[i - 1].y) {
+                dir.back = true;
+            }
+            oldPos.x = cube.position.x;
+            oldPos.y = cube.position.y;
+        }
+
     }
 
     function step(i) {
