@@ -36,8 +36,8 @@
 <script>
     var renderer, scene, camera, pointLight, spotLight, ground, cube;
     var map = [], tmp, finish = false, oldPos = {x: 0, y: 0}, moving = false;
-    var position = {x: 0, y: 0, curSide: ""}, target = {x: 0, y: 0, targetSide: ""};
-    var rotWorldMatrix, state = {x: 0, y: 0, side: "", parent: null};
+    var position = {x: 0, y: 0, curSide: "", f: 1000, depth: 0}, target = {x: 0, y: 0, targetSide: ""};
+    var rotWorldMatrix, state = {x: 0, y: 0, side: "", parent: null, turn: 0, f: 1000, depth: 0};
     const loader = new THREE.TextureLoader();
     var xAxis = new THREE.Vector3(1, 0, 0);
     var yAxis = new THREE.Vector3(0, 1, 0);
@@ -50,6 +50,178 @@
         front: "front",
         back: "back"
     };
+
+    //lab2
+    var deleted = [];
+
+    class DeletedState {
+        // DeletedState() {
+        // }
+
+        constructor(parent, f, direction, depth) {
+            this.parent = parent;
+            this.f = f;
+            this.direction = direction;
+        }
+
+        Recovery() {
+            let tmp = new Object(state);
+            tmp = Object.assign({}, this.parent);
+            tmp.turn = this.direction;
+            tmp.f = this.f;
+            tmp.depth++;
+            tmp.parent = this.parent;
+            step(this.direction, tmp);
+            return tmp;
+        }
+    }
+
+    function addDel(val) {
+        let n = val.f;
+        let delSt = new DeletedState(val.parent, val.f, val.turn);
+
+        if (deleted.length === 0)
+            deleted.push(delSt);
+        else if (deleted[0].f < n)
+            deleted.unshift(delSt);
+        else if (deleted[deleted.length - 1].f > n)
+            deleted.push(delSt);
+        else {
+            let i = 0;
+            while (deleted[i].f > n)
+                i++;
+            deleted.splice(i, delSt);
+        }
+    }
+
+    function addList(val, list) {
+        let n = val.f;
+
+        if (list.length === 0)
+            list.push(val);
+        else if (list[0].f < n)
+            list.unshift(val);
+        else if (list[list.length - 1].f > n)
+            list.push(val);
+        else {
+            let i = 0;
+            while (list[i].f > n)
+                i++;
+            list.splice(i, 0, val);
+        }
+    }
+
+    function ContainsSMA(st) {
+        let result = false;
+        let tmpstate;
+        for (let i = openlist.length - 1; i >= 0; i--) {
+            if (OpenContains(st)) {
+                if (st.f < openlist[i].f) {
+                    tmpstate = openlist[i];
+                    openlist.splice(i, 1);
+
+                    //замена ~f на f
+                    tmpstate.f = st.f;
+                    tmpstate.parent = st.parent;
+
+                    addList(tmpstate, openlist);
+                }
+                result = true;
+            }
+        }
+
+        for (let i = closelist.length - 1; i >= 0; i--) {
+            if (CloseContains(st)) {
+                if (st.f < closelist[i].f) {
+                    closelist.splice(i, 1);
+                    addList(st, openlist);
+                }
+                result = true;
+            }
+
+        }
+        return result;
+
+    }
+
+    var maxSize = 5;
+
+    function SMA() {
+        let wayfound = false;
+        let el;
+        while (openlist.length != 0) {
+            if (deleted.length != 0) {
+                if (openlist[openlist.length - 1].f > deleted[deleted.length - 1].f) {
+                    el = deleted.pop().Recovery();
+                    console.log(el);
+                } else
+                    el = openlist.pop();
+            } else
+                el = openlist.pop();
+
+            if (algCheckState(el)) {
+                addList(el, closelist);
+                wayfound = true;
+                alert("Way found!");
+                backTracking(el);
+                console.log(backList);
+                break;
+            }
+            addList(el, closelist);
+
+            for (let i = 0; i < 4; i++) {
+                state = Object.assign({}, el);
+                if (step(i, state) === "fall")
+                    continue;
+                else {
+                    state.parent = el;
+                    state.f = 0;
+                    calc(state);
+                    if (!ContainsSMA(state)) {
+                        state.depth++;
+                        addList(state, openlist);
+                    }
+                    if (openlist.length - 1 > maxSize) {
+                        addDel(openlist[0]);
+                        openlist.splice(0, 1);
+                    }
+                }
+            }
+        }
+        if (!wayfound)
+            console.log('Решение не найдено');
+    }
+
+    function calc(val) {
+        let f = state.f;
+        let k = 4;
+        let manh;
+
+        manh = Math.abs(state.x - target.x) - Math.abs(state.y - target.y) + 2;
+
+        val.f = (f + manh) + val.depth;
+
+    }
+
+    var backList = [];
+
+    function StartPos(arr1, arr2) {
+        if (arr1.x == arr2.x && arr1.y == arr2.y && arr1.curSide == arr2.curSide)
+            return true;
+        return false;
+    }
+
+    function backTracking(res) {
+        let startCondition;
+        while (!StartPos(res, start)) {
+            backList.unshift(res);
+            res = res.parent;
+        }
+        backList.unshift(res);
+        // console.log(backlist);
+    }
+
+    //
 
     function setup() {
         let canv = document.querySelectorAll("div");
@@ -77,6 +249,7 @@
         }
     });
 
+    var start = [];
 
     function CreateMap() {
         let geometry, texture, mesh, material;
@@ -111,6 +284,7 @@
                         position.x = j;
                         position.y = i;
                         position.curSide = sides.back;
+                        start = position;
                         cube.position.set(width + (j * 50), height, ground.position.z + geometry.parameters.depth + (cube.geometry.parameters.depth / 2) + 2 + 1);
                         texture = texPlayer;
                         break;
@@ -294,7 +468,8 @@
                     }
                     case Key.SPACE: {
                         openlist.push(position);
-                        OpenAction();
+                        SMA();
+                        // OpenAction();
                         break;
                     }
                     default:
@@ -469,6 +644,20 @@
         }
     }
 
+    function OpenContains(state) {
+        for (let i = 0; i < openlist.length; i++)
+            if (openlist[i].x === state.x && openlist[i].y === state.y && openlist[i].curSide === state.curSide)
+                return true;
+        return false;
+    }
+
+    function CloseContains(state) {
+        for (let j = 0; j < closelist.length; j++)
+            if (state.x === closelist[j].x && state.y === closelist[j].y && state.curSide === closelist[j].curSide)
+                return true;
+        return false;
+    }
+
     function Contains() {
         for (let i = 0; i < openlist.length; i++)
             if (openlist[i].x === state.x && openlist[i].y === state.y && openlist[i].curSide === state.curSide)
@@ -507,7 +696,7 @@
             deadend = true;
             for (let i = 0; i < 4; i++) {
                 state = Object.assign({}, el);
-                if (step(i) === "fall")
+                if (step(i, state) === "fall")
                     continue;
                 else {
                     state.parent = el;
@@ -551,7 +740,7 @@
 
     }
 
-    function step(i) {
+    function step(i, state) {
         if (i === 0) {
             if (map[0].length - 1 >= state.x && state.x > 0)
                 if (map[state.y][state.x - 1] != 0 && state.x > 0) {
@@ -560,6 +749,7 @@
                         algSideChange("right");
                         return "fall";
                     }
+                    state.step = 0;
                     state.x--;
                     return "step";
                 }
@@ -571,6 +761,7 @@
                         algSideChange("back");
                         return "fall";
                     }
+                    state.step = 1;
                     state.y--;
                     return "step";
                 }
@@ -583,7 +774,7 @@
                         algSideChange("left");
                         return "fall";
                     }
-
+                    state.step = 2;
                     state.x++;
                     return "step";
                 }
@@ -596,6 +787,7 @@
                         algSideChange("front");
                         return "fall";
                     }
+                    state.step = 3;
                     state.y++;
                     return "step";
                 }
