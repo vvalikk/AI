@@ -36,7 +36,7 @@
 <script>
     var renderer, scene, camera, pointLight, spotLight, ground, cube;
     var map = [], tmp, finish = false, oldPos = {x: 0, y: 0}, moving = false;
-    var position = {x: 0, y: 0, curSide: "", f: 1000, depth: 0}, target = {x: 0, y: 0, targetSide: ""};
+    var position = {x: 0, y: 0, curSide: "", f: 5, depth: 0}, target = {x: 0, y: 0, targetSide: ""};
     var rotWorldMatrix, state = {x: 0, y: 0, side: "", parent: null, turn: 0, f: 1000, depth: 0};
     const loader = new THREE.TextureLoader();
     var xAxis = new THREE.Vector3(1, 0, 0);
@@ -90,7 +90,7 @@
             let i = 0;
             while (deleted[i].f > n)
                 i++;
-            deleted.splice(i, delSt);
+            deleted.splice(i, 0, delSt);
         }
     }
 
@@ -112,44 +112,52 @@
     }
 
     function ContainsSMA(st) {
-        let result = false;
+        let result = true;
         let tmpstate;
-        for (let i = openlist.length - 1; i >= 0; i--) {
-            if (OpenContains(st)) {
+        if (OpenContains(st)) {
+            for (let i = openlist.length - 1; i >= 0; i--) {
                 if (st.f < openlist[i].f) {
                     tmpstate = openlist[i];
                     openlist.splice(i, 1);
 
                     //замена ~f на f
-                    tmpstate.f = st.f;
-                    tmpstate.parent = st.parent;
+                    // tmpstate.f = st.f;
+                    // tmpstate.parent = st.parent;
+                    // tmpstate.depth = st.depth;
 
                     addList(tmpstate, openlist);
+                    // result = false;
+                    // break;
                 }
-                result = true;
+                result = false;
             }
         }
 
-        for (let i = closelist.length - 1; i >= 0; i--) {
-            if (CloseContains(st)) {
+        if (CloseContains(st)) {
+            for (let i = closelist.length - 1; i >= 0; i--) {
                 if (st.f < closelist[i].f) {
+                    // result = false;
                     closelist.splice(i, 1);
+                    // st.parent = closelist[i].parent;
                     addList(st, openlist);
+                    // break;
                 }
-                result = true;
+                result = false;
             }
-
         }
         return result;
 
     }
 
-    var maxSize = 5;
+    var maxSize = 500;
 
     function SMA() {
         let wayfound = false;
         let el;
+        let count = 0;
+
         while (openlist.length != 0) {
+            count++;
             if (deleted.length != 0) {
                 if (openlist[openlist.length - 1].f > deleted[deleted.length - 1].f) {
                     el = deleted.pop().Recovery();
@@ -158,13 +166,13 @@
                     el = openlist.pop();
             } else
                 el = openlist.pop();
-
             if (algCheckState(el)) {
                 addList(el, closelist);
                 wayfound = true;
-                alert("Way found!");
+                console.log("Way found for " + count + " steps.");
                 backTracking(el);
                 console.log(backList);
+                animatePath(backList);
                 break;
             }
             addList(el, closelist);
@@ -177,7 +185,7 @@
                     state.parent = el;
                     state.f = 0;
                     calc(state);
-                    if (!ContainsSMA(state)) {
+                    if (ContainsSMA(state)) {
                         state.depth++;
                         addList(state, openlist);
                     }
@@ -190,16 +198,17 @@
         }
         if (!wayfound)
             console.log('Решение не найдено');
+
     }
 
     function calc(val) {
-        let f = state.f;
-        let k = 4;
         let manh;
 
-        manh = Math.abs(state.x - target.x) - Math.abs(state.y - target.y) + 2;
-
-        val.f = (f + manh) + val.depth;
+        manh = (Math.abs(val.x - target.x) + Math.abs(val.y - target.y));
+        if (val.x == target.x && val.y == target.y && val.curSide != target.targetSide)
+            val.f = val.depth * 20;
+        else
+            val.f = (manh + val.depth) * manh;
 
     }
 
@@ -212,7 +221,6 @@
     }
 
     function backTracking(res) {
-        let startCondition;
         while (!StartPos(res, start)) {
             backList.unshift(res);
             res = res.parent;
@@ -596,8 +604,6 @@
 
     function algCheckState(state) {
         if (state.x == target.x && state.y == target.y && state.curSide == target.targetSide && state.curSide != "" && target.targetSide != "") {
-            alert("yay");
-            // finish = true;
             return true;
         } else
             return false
@@ -688,7 +694,7 @@
                 wayfound = true;
                 console.log("way found at x: " + el.x + " y: " + el.y + " on side:" + el.curSide + " it takes: " + count + " steps");
                 console.log(closelist);
-                animatePath();
+                animatePath(closelist);
                 alert("Way found!");
                 break;
             }
@@ -722,7 +728,7 @@
         closelist.push(ctmp);
     }
 
-    async function animatePath() {
+    async function animatePath(closelist) {
         for (let i = 1; i < closelist.length; i++) {
             await sleep(500);
             if (closelist[i].x > closelist[i - 1].x) {
@@ -740,9 +746,10 @@
 
     }
 
+
     function step(i, state) {
         if (i === 0) {
-            if (map[0].length - 1 >= state.x && state.x > 0)
+            if (map[1].length - 1 >= state.x && state.x > 0)
                 if (map[state.y][state.x - 1] != 0 && state.x > 0) {
                     algSideChange("left");
                     if (map[state.y][state.x - 1] == 4 && state.x > 0 && state.curSide != sides.bot) {
@@ -766,8 +773,7 @@
                     return "step";
                 }
         } else if (i === 2) {
-
-            if (map[0].length - 1 >= state.x + 1)
+            if (map[1].length - 1 >= state.x + 1)
                 if (map[state.y][state.x + 1] != 0 && (state.x >= 0 && state.x < map[0].length - 1)) {
                     algSideChange("right");
                     if (map[state.y][state.x + 1] == 4 && state.x >= 0 && state.x < map[0].length - 1 && state.curSide != sides.bot) {
