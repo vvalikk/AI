@@ -55,9 +55,6 @@
     var deleted = [];
 
     class DeletedState {
-        // DeletedState() {
-        // }
-
         constructor(parent, f, direction, depth) {
             this.parent = parent;
             this.f = f;
@@ -79,7 +76,7 @@
 
     function addDel(val) {
         let n = val.f;
-        let delSt = new DeletedState(val.parent, val.f, val.turn, val.depth);
+        let delSt = new DeletedState(val.parent, val.f, val.step, val.depth);
 
         if (deleted.length === 0)
             deleted.push(delSt);
@@ -97,7 +94,6 @@
 
     function addList(val, list) {
         let n = val.f;
-
         if (list.length === 0)
             list.push(val);
         else if (list[0].f < n)
@@ -112,17 +108,22 @@
         }
     }
 
-    function ContainsSMA(st) {
+    function checkCond(state) {
+        if (map[state.y][state.x] == 4 && state.curSide != 'bottom')
+            return false
+        else return true;
+
+    }
+
+    function DontContainsSMA(st) {
         let result = true;
         let tmpstate;
         for (let i = openlist.length - 1; i >= 0; i--) {
             if (OpenContains(st)) {
-                if (st.f < openlist[i].f) {
+                if (st.f < openlist[i].f && checkCond(st)) {
                     tmpstate = openlist[i];
                     openlist.splice(i, 1);
-                    // //замена ~f на f
                     tmpstate.f = st.f;
-                    tmpstate.parent = st.parent;
                     tmpstate.depth = st.depth;
                     addList(tmpstate, openlist);
                 }
@@ -132,7 +133,7 @@
 
         for (let i = closelist.length - 1; i >= 0; i--) {
             if (CloseContains(st)) {
-                if (st.f < closelist[i].f) {
+                if (st.f < closelist[i].f && checkCond(st)) {
                     closelist.splice(i, 1);
                     addList(st, openlist);
                 }
@@ -143,7 +144,7 @@
 
     }
 
-    var maxSize = 500;
+    var maxSize = 50;
 
     function SMA() {
         let wayfound = false;
@@ -178,13 +179,13 @@
                     continue;
                 else {
                     state.parent = el;
-                    state.f = 0;
+                    // state.f = 0;
                     calc(state);
-                    if (ContainsSMA(state)) {
+                    if (DontContainsSMA(state)) {
                         state.depth++;
                         addList(state, openlist);
                     }
-                    if (openlist.length - 1 > maxSize) {
+                    if (openlist.length > maxSize) {
                         addDel(openlist[0]);
                         openlist.splice(0, 1);
                     }
@@ -207,8 +208,7 @@
         } else if (val.x == target.x && val.y == target.y && val.curSide == target.targetSide)
             val.f = 0;
         else
-            val.f = (manh) + val.depth;
-
+            val.f = manh + val.depth;
     }
 
     var backList = [];
@@ -464,7 +464,7 @@
                         if (map.length > position.y + 1)
                             if (map[position.y + 1][position.x] != 0 && (position.y >= 0 && position.y < map.length) && !moving) {
                                 SideChange("back");
-                                if (map[position.y + 1][position.x] == 4 && (position.y >= 0 && position.y < map.length && position.curSide == sides.bot)) {
+                                if (map[position.y + 1][position.x] == 4 && (position.y >= 0 && position.y < map.length && position.curSide != sides.bot)) {
                                     SideChange("front");
                                     break;
                                 }
@@ -649,27 +649,16 @@
     }
 
     function OpenContains(state) {
-        for (let i = 0; i < openlist.length; i++)
+        for (let i = 0; i < openlist.length - 1; i++)
             if (openlist[i].x === state.x && openlist[i].y === state.y && openlist[i].curSide === state.curSide)
                 return true;
         return false;
     }
 
     function CloseContains(state) {
-        for (let j = 0; j < closelist.length; j++)
+        for (let j = 0; j < closelist.length - 1; j++)
             if (state.x === closelist[j].x && state.y === closelist[j].y && state.curSide === closelist[j].curSide)
                 return true;
-        return false;
-    }
-
-    function Contains() {
-        for (let i = 0; i < openlist.length; i++)
-            if (openlist[i].x === state.x && openlist[i].y === state.y && openlist[i].curSide === state.curSide)
-                return true;
-        for (let j = 0; j < closelist.length; j++)
-            if (state.x === closelist[j].x && state.y === closelist[j].y && state.curSide === closelist[j].curSide)
-                return true;
-
         return false;
     }
 
@@ -734,7 +723,7 @@
             if (map.length - 1 >= state.y + 1)
                 if (map[state.y + 1][state.x] != 0 && (state.y >= 0 && state.y < map.length)) {
                     algSideChange("back");
-                    if (map[state.y + 1][state.x] == 4 && (state.y >= 0 && state.y < map.length && state.curSide == sides.bot)) {
+                    if (map[state.y + 1][state.x] == 4 && (state.y >= 0 && state.y < map.length && state.curSide != sides.bot)) {
                         algSideChange("front");
                         return "fall";
                     }
